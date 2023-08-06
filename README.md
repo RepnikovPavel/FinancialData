@@ -31,7 +31,39 @@ params = {
             'seed':0
         }    
 ```
+___
 
+```python
+AUC 0.7785637114675654
+Gini 0.5571274229351308
+params = {
+    'eta': 0.05,
+    'subsample': 0.0,
+    'max_depth': 6,
+    'learning_rate': 0.05,
+    'n_estimators': 3000,
+    'gamma':  0.1,
+    'subsample': 0.5,
+    'colsample_bytree':0.5, 
+    'colsample_bylevel':0.5, 
+    'colsample_bynode':0.5,
+    'lambda': 1.5,
+    'alpha': 0.1,
+    'scale_pos_weight': np.sum(np.where(Y==0))/np.sum(np.where(Y==1)),
+    'min_child_weight': 5,
+    'max_delta_step': 5,
+    'objective':'binary:logistic',
+    'eval_metric': eval_metric, 
+    'tree_method':'gpu_hist',
+    'gpu_id':0,
+    'seed':0
+}    
+```
+add:  
+nan augmentation for most valueble categorial feature  
+results:  
+distribution of answers on train and test are same now
+___
 
 
 
