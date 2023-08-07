@@ -223,20 +223,49 @@ def get_value_by_segment(x, counts_,bins_):
             return counts_[i-1]
     return 0.0
 
+@jit(nopython=True)
+def get_bin_index_by_value(x, bins_):
+    if x < bins_[0]:
+        return -1
+    if x> bins_[-1]:
+        return len(bins_)
+    for i in range(1,len(bins_)-1):
+        if x<= bins_[i] and x>= bins_[i-1]:
+            return i-1
+
 class Distrib1D:
     counts_: np.array
     bins_: np.array
     max_: np.float64
     a_: np.float64
     b_: np.float64
+    std_: np.float64
     def __init__(self,table:pd.DataFrame, column_name:str):
         self.counts_, self.bins_ = np.histogram(table[column_name].dropna(), density=True)
         self.max_ = np.max(self.counts_)
         self.a_= self.bins_[0]
         self.b_= self.bins_[-1]
+        self.std_ = np.nanstd(table[column_name])
     def __call__(self, x):
         return get_value_by_segment(x,self.counts_,self.bins_)
-
+    def mutate_value(self,x):
+        # get segment of value
+        # if current_segment == -1:
+        # if current_segment == len(self.bins_):
+        if self.std_ < self.bins_[1]-self.bins_[0]:
+            # move to nearest cells 
+            current_segment = get_bin_index_by_value(x)
+            distance = int(np.random.normal(loc=1,scale=len(self.bins_)/3))
+            new_pos = current_segment+distance
+            return np.maximum(0,self.bins_[0] + new_pos*(self.bins_[1]-self.bins_[0]))
+        else:
+            dtype_ = str(type(x))
+            delta = np.random.normal(loc=0.0,scale=self.std_)
+            o_ = x + delta
+            if 'int' in dtype_:
+                return np.maximum(0,int(o_))
+            else:
+                return np.maximum(0,o_)
 
 
 def rho_between_features_vectorized(table, r_index, r_indexes_2, cName, distributions, buffer)->np.array:
@@ -356,11 +385,22 @@ def get_neig(X,Y, formatters_):
         index_of_row_neighbors.update({i:k_neig_indexes})
     return index_of_row_neighbors
 
+
+
 def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
-    
+    # make distributions
+    distributions = {} 
+    for cName in formatters_:
+        if cName not in X:
+            continue
+        expected_type = formatters_[cName]['to_type']
+        if 'int' in expected_type or 'float' in expected_type:
+            distr_ = Distrib1D(X,cName)
+            distributions.update({cName:distr_})
 
-    # data categorial data augmentation
+
+    # nan augmentation for categorial features
     X_aug = X.copy()
     Y_aug = Y.copy()
     N = X_aug.shape[0]
@@ -370,12 +410,28 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
             position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_categorial_nan))
             X_aug.loc[position_of_nan, nan_aug_feature] = pd.NA
             # X_aug[nan_aug_feature] = np.insert(X_aug[nan_aug_feature].values, position_of_nan, np.nan)
-    
+
+    print('mutate numeric values using distribution knowledge')
+    # mutate numeric values using distribution knowledge
+    X_aug2 = X.copy()
+    Y_aug2 = Y.copy()
+    for cName in distributions:
+        print(cName)
+        X_aug2[cName] = X_aug2[cName].apply(distributions[cName])
+
+    # nan augmentation for numeric features
+    X_aug3 = X.copy()
+    Y_aug3 = Y.copy()
+    rate_of_numeric_nan = 0.5
+    for cName in distributions:
+        position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_numeric_nan))
+        X_aug3.loc[position_of_nan, cName] = pd.NA
 
 
+    X_final = pd.concat([X,X_aug,X_aug2,X_aug3])
+    Y_final = pd.concat([Y,Y_aug,Y_aug2,Y_aug3])
 
-    X_final = pd.concat([X,X_aug])
-    Y_final = pd.concat([Y,Y_aug])
+    return X_final,Y_final
 
 
 
@@ -460,7 +516,7 @@ if __name__ == '__main__':
     # # # make train dataset
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
     print('train augmentation')
-    train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
+    X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
     X_train_dataset.to_csv(conf.X_train_dataset,index=False)
     Y_train.to_csv(conf.Y_train_dataset,index=False)
 
