@@ -255,7 +255,7 @@ class Distrib1D:
         if self.std_ < self.bins_[1]-self.bins_[0]:
             # move to nearest cells 
             current_segment = get_bin_index_by_value(x)
-            distance = int(np.random.normal(loc=1,scale=len(self.bins_)/3))
+            distance = int(np.random.normal(loc=1,scale=len(self.bins_)/2))
             new_pos = current_segment+distance
             return np.maximum(0,self.bins_[0] + new_pos*(self.bins_[1]-self.bins_[0]))
         else:
