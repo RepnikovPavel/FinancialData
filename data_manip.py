@@ -341,23 +341,12 @@ def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
 
     return X,Y
 
-def get_neigs_of(i,N,X,Y,corr_m,distributions,names_of_columns):
+def get_neigs_of(i,N,X,corr_m,distributions,names_of_columns):
     indexes = np.setdiff1d(np.random.randint(low=0,high=X.shape[0],size=N),[i])
     distances = rho_between_row_and_rows(X, r_index=i,r_indexes_2=indexes,distributions=distributions,corr_m=corr_m,names_of_columns=names_of_columns)
     argsort_by_distance = np.argsort(distances)
     k_neig_indexes = [indexes[el] for el in argsort_by_distance]
-    base_label = Y[i]
-    neighs_labels = [Y[el] for el in k_neig_indexes]
-    neights_with_same_label = []
-    for j in range(len(neighs_labels)):
-        if neighs_labels[j] == base_label:
-            neights_with_same_label.append(neighs_labels[j])
-        else:
-            continue
-    if len(neights_with_same_label) == 0:
-        print('no maching')
-        neights_with_same_label.append(neighs_labels[0])
-    return neights_with_same_label
+    return k_neig_indexes
 
 def make_batches(vector_of_numbers: np.array, num_of_batches: int) -> Tuple[np.array, np.array]:
     N = len(vector_of_numbers)
@@ -368,13 +357,13 @@ def make_batches(vector_of_numbers: np.array, num_of_batches: int) -> Tuple[np.a
     rest = vector_of_numbers[num_of_batches * batch_size:]
     return batches, rest
 
-def get_nighs_for_batch_of_objects(conn,target_indexes,index_of_thread, X, Y, N, distributions, names_of_columns,corr_m):
+def get_nighs_for_batch_of_objects(conn,target_indexes,index_of_thread, X, N, distributions, names_of_columns,corr_m):
     index_of_row_neighbors = {}
     k_ = 0
     for i in target_indexes:
         if index_of_thread == 0:
             print('\r{}/{}'.format(k_,len(target_indexes)),end='')
-        neights_with_same_label = get_neigs_of(i,N,X,Y,corr_m,distributions,names_of_columns)
+        neights_with_same_label = get_neigs_of(i,N,X,corr_m,distributions,names_of_columns)
         index_of_row_neighbors.update({i:neights_with_same_label})
         k_ += 1
     print('')
@@ -382,7 +371,7 @@ def get_nighs_for_batch_of_objects(conn,target_indexes,index_of_thread, X, Y, N,
     conn.close()
 
 
-def get_neig(X,Y, formatters_): 
+def get_neig(X,formatters_): 
     # make distributions
     distributions = {} 
     for cName in formatters_:
@@ -399,7 +388,6 @@ def get_neig(X,Y, formatters_):
     NUMBER_OF_PROCESSORS = 8
 
     corr_m = np.absolute(corr_mat.loc[names_of_columns][names_of_columns].to_numpy())
-    Y = Y['loan_status'].values
     batches, rest = make_batches(vector_of_numbers=np.arange(start=0,stop=X.shape[0],step=1),num_of_batches=NUMBER_OF_PROCESSORS)
     
     output_of_processes = []
@@ -408,13 +396,13 @@ def get_neig(X,Y, formatters_):
     for i in range(NUMBER_OF_PROCESSORS):
         parent_conn, child_conn = mp.Pipe()
         parent_coons.append(parent_conn)
-        p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(batches[i]),i, X.copy(), copy.deepcopy(Y), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
+        p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(batches[i]),i, X.copy(), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
         processes.append(p)
         p.start()
     if len(rest) > 0:
         parent_conn, child_conn = mp.Pipe()
         parent_coons.append(parent_conn)
-        rest_p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(rest), NUMBER_OF_PROCESSORS, X.copy(), copy.deepcopy(Y), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
+        rest_p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(rest), NUMBER_OF_PROCESSORS, X.copy(), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
         processes.append(rest_p)
         rest_p.start()
 
@@ -583,15 +571,14 @@ if __name__ == '__main__':
     X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
     X_test_dataset.to_csv(conf.X_test_dataset,index=False)
 
-    # # get neigh for train 
-    # print('get neighs for train')
-    # neighs_dict_train = get_neig(X_train,Y_train,formatters_=formatter_)
-    # torch.save(neighs_dict_train,conf.train_neighs)
+    # get neigh for train 
+    print('get neighs for train')
+    neighs_dict_train = get_neig(X_train,formatters_=formatter_)
+    torch.save(neighs_dict_train,conf.train_neighs)
     # get neight for test
-    # print('get neigs for test')
-    # Y_ficticious = {'loan_status':np.ones(shape=(X_test.shape[0],),dtype=np.int32)}
-    # neighs_dict_test = get_neig(X_test,Y=pd.DataFrame(Y_ficticious),formatters_=formatter_)
-    # torch.save(neighs_dict_test,conf.test_neights)
+    print('get neigs for test')
+    neighs_dict_test = get_neig(X_test,formatters_=formatter_)
+    torch.save(neighs_dict_test,conf.test_neights)
 
     print('train augmentation')
     X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
