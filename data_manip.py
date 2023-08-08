@@ -50,7 +50,7 @@ from torchmetrics.detection.mean_ap import MeanAveragePrecision as mAP
 from matplotlib.transforms import Affine2D
 import mpl_toolkits.axisartist.floating_axes as floating_axes
 from IPython.display import IFrame, display, HTML
-
+import multiprocessing as mp
 import matplotlib
 matplotlib.use('TkAgg')
 
@@ -341,7 +341,48 @@ def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
 
     return X,Y
 
-def get_neig(X,Y, formatters_):
+def get_neigs_of(i,N,X,Y,corr_m,distributions,names_of_columns):
+    indexes = np.setdiff1d(np.random.randint(low=0,high=X.shape[0],size=N),[i])
+    distances = rho_between_row_and_rows(X, r_index=i,r_indexes_2=indexes,distributions=distributions,corr_m=corr_m,names_of_columns=names_of_columns)
+    argsort_by_distance = np.argsort(distances)
+    k_neig_indexes = [indexes[el] for el in argsort_by_distance]
+    base_label = Y.loc[i]
+    neighs_labels = [Y.loc[el] for el in k_neig_indexes]
+    neights_with_same_label = []
+    for j in range(len(neighs_labels)):
+        if neighs_labels[j] == base_label:
+            neights_with_same_label.append(neighs_labels[j])
+        else:
+            continue
+    if len(neights_with_same_label) == 0:
+        print('no maching')
+        neights_with_same_label.append(neighs_labels[0])
+    return neights_with_same_label
+
+def make_batches(vector_of_numbers: np.array, num_of_batches: int) -> Tuple[np.array, np.array]:
+    N = len(vector_of_numbers)
+    batch_size = N // num_of_batches
+    batches = np.zeros(shape=(num_of_batches, batch_size), dtype=np.intc)
+    for i in range(num_of_batches):
+        batches[i] = vector_of_numbers[i * batch_size:(i + 1) * batch_size]
+    rest = vector_of_numbers[num_of_batches * batch_size:]
+    return batches, rest
+
+def get_nighs_for_batch_of_objects(conn,target_indexes,index_of_thread, X, Y, N, distributions, names_of_columns,corr_m):
+    index_of_row_neighbors = {}
+    k_ = 0
+    for i in target_indexes:
+        if index_of_thread == 0:
+            print('\r{}/{}'.format(k_,len(target_indexes)),end='')
+        neights_with_same_label = get_neigs_of(i,N,X,Y,corr_m,distributions,names_of_columns)
+        index_of_row_neighbors.update({i:neights_with_same_label})
+        k_ += 1
+    print('')
+    conn.send(index_of_row_neighbors)
+    conn.close()
+
+
+def get_neig(X,Y, formatters_): 
     # make distributions
     distributions = {} 
     for cName in formatters_:
@@ -354,38 +395,57 @@ def get_neig(X,Y, formatters_):
 
     names_of_columns = list(distributions.keys())
     corr_mat = X.corr()
-    K = 3
-    N = 10
-    index_of_row_neighbors = {}
+    N = 1000
+    NUMBER_OF_PROCESSORS = 8
+
     corr_m = np.absolute(corr_mat.loc[names_of_columns][names_of_columns].to_numpy())
-    for i in range(X.shape[0]):
-        print('{}/{}'.format(i,X.shape[0]))
-        indexes = np.setdiff1d(np.random.randint(low=0,high=X.shape[0],size=N),[i])
-        distances = rho_between_row_and_rows(X, r_index=i,r_indexes_2=indexes,distributions=distributions,corr_m=corr_m,names_of_columns=names_of_columns)
+    batches, rest = make_batches(vector_of_numbers=np.arange(start=0,stop=X.shape[0],step=1),num_of_batches=NUMBER_OF_PROCESSORS)
+    
+    output_of_processes = []
+    processes = []
+    parent_coons = []
+    for i in range(NUMBER_OF_PROCESSORS):
+        parent_conn, child_conn = mp.Pipe()
+        parent_coons.append(parent_conn)
+        p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,batches[i],i, X, Y, N, distributions, names_of_columns,corr_m))
+        processes.append(p)
+        p.start()
+    if len(rest) > 0:
+        parent_conn, child_conn = mp.Pipe()
+        parent_coons.append(parent_conn)
+        rest_p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,rest, NUMBER_OF_PROCESSORS, X, Y, N, distributions, names_of_columns,corr_m))
+        processes.append(rest_p)
+        rest_p.start()
 
-        argsort_by_distance = np.argsort(distances)
-        k_neig_indexes = [indexes[el] for el in argsort_by_distance]
-        # base = [X.loc[i][names_of_columns].values]
-        # n_ith = [X.loc[k_neig_indexes[k]][names_of_columns].values for k in range(K)]
-        # matrix_ = np.array(base+n_ith)
-        # x=pd.DataFrame(matrix_,columns=names_of_columns)
-        # x= x.to_html()
-        # html_template = """
-        # <html>
-        # <head></head>
-        # <body>
-        # {}        
-        # </body>
-        # </html>
-        # """.format(x)
-        # tmp_file = open(os.path.join(conf.data_folder,"tmp_plotting.html"),'w')
-        # tmp_file.write(html_template)
-        # tmp_file.close()
-        # raise SystemExit
-        index_of_row_neighbors.update({i:k_neig_indexes})
-    return index_of_row_neighbors
+    for i in range(NUMBER_OF_PROCESSORS):
+        output_of_process = parent_coons[i].recv()
+        output_of_processes.append(output_of_process)
+        processes[i].join()
+    d_o = {}
+    for i in range(len(output_of_processes)):
+        d_o.update(output_of_processes[i])
+    
+    return d_o
 
 
+
+# base = [X.loc[i][names_of_columns].values]
+# n_ith = [X.loc[k_neig_indexes[k]][names_of_columns].values for k in range(K)]
+# matrix_ = np.array(base+n_ith)
+# x=pd.DataFrame(matrix_,columns=names_of_columns)
+# x= x.to_html()
+# html_template = """
+# <html>
+# <head></head>
+# <body>
+# {}        
+# </body>
+# </html>
+# """.format(x)
+# tmp_file = open(os.path.join(conf.data_folder,"tmp_plotting.html"),'w')
+# tmp_file.write(html_template)
+# tmp_file.close()
+# raise SystemExit
 
 def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
@@ -515,6 +575,12 @@ if __name__ == '__main__':
     X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
     # # # make train dataset
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
+
+    # get neigh
+    neighs_dict = get_neig(X_train_dataset,Y_train,formatters_=formatter_)
+    torch.save(neighs_dict,conf.train_neighs)
+    raise SystemExit
+
     print('train augmentation')
     X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
     X_train_dataset.to_csv(conf.X_train_dataset,index=False)

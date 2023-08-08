@@ -9,6 +9,7 @@ X_train_reformated = os.path.join(data_folder,'X_train_reformated.csv')
 cat_encoders_path = os.path.join(data_folder,'cat_encoders.txt')
 X_train_dataset = os.path.join(data_folder,'X_train_dataset.csv')
 Y_train_dataset = os.path.join(data_folder,'Y_train_dataset.csv')
+train_neighs = os.path.join(data_folder,'train_neighs.txt')
 
 
 X_test_reformated = os.path.join(data_folder,'X_test_reformated.csv')
