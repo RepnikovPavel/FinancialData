@@ -11,7 +11,7 @@ import cv2
 from aml.train_pipeline import *  
 from aml.train_pipeline import *
 import pandas as pd
-
+import copy
 import os
 import torchvision
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor,FasterRCNN_ResNet50_FPN_Weights
@@ -346,8 +346,8 @@ def get_neigs_of(i,N,X,Y,corr_m,distributions,names_of_columns):
     distances = rho_between_row_and_rows(X, r_index=i,r_indexes_2=indexes,distributions=distributions,corr_m=corr_m,names_of_columns=names_of_columns)
     argsort_by_distance = np.argsort(distances)
     k_neig_indexes = [indexes[el] for el in argsort_by_distance]
-    base_label = Y.loc[i]
-    neighs_labels = [Y.loc[el] for el in k_neig_indexes]
+    base_label = Y[i]
+    neighs_labels = [Y[el] for el in k_neig_indexes]
     neights_with_same_label = []
     for j in range(len(neighs_labels)):
         if neighs_labels[j] == base_label:
@@ -399,6 +399,7 @@ def get_neig(X,Y, formatters_):
     NUMBER_OF_PROCESSORS = 8
 
     corr_m = np.absolute(corr_mat.loc[names_of_columns][names_of_columns].to_numpy())
+    Y = Y['loan_status'].values
     batches, rest = make_batches(vector_of_numbers=np.arange(start=0,stop=X.shape[0],step=1),num_of_batches=NUMBER_OF_PROCESSORS)
     
     output_of_processes = []
@@ -407,13 +408,13 @@ def get_neig(X,Y, formatters_):
     for i in range(NUMBER_OF_PROCESSORS):
         parent_conn, child_conn = mp.Pipe()
         parent_coons.append(parent_conn)
-        p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,batches[i],i, X, Y, N, distributions, names_of_columns,corr_m))
+        p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(batches[i]),i, X.copy(), copy.deepcopy(Y), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
         processes.append(p)
         p.start()
     if len(rest) > 0:
         parent_conn, child_conn = mp.Pipe()
         parent_coons.append(parent_conn)
-        rest_p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,rest, NUMBER_OF_PROCESSORS, X, Y, N, distributions, names_of_columns,corr_m))
+        rest_p = mp.Process(target=get_nighs_for_batch_of_objects, args=(child_conn,copy.deepcopy(rest), NUMBER_OF_PROCESSORS, X.copy(), copy.deepcopy(Y), N, copy.deepcopy(distributions), copy.deepcopy(names_of_columns),copy.deepcopy(corr_m)))
         processes.append(rest_p)
         rest_p.start()
 
@@ -576,19 +577,26 @@ if __name__ == '__main__':
     # # # make train dataset
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
 
-    # get neigh
-    neighs_dict = get_neig(X_train_dataset,Y_train,formatters_=formatter_)
-    torch.save(neighs_dict,conf.train_neighs)
-    raise SystemExit
+    print('test encoding')
+    # make test dataset
+    X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
+    X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
+    X_test_dataset.to_csv(conf.X_test_dataset,index=False)
+
+    # # get neigh for train 
+    # print('get neighs for train')
+    # neighs_dict_train = get_neig(X_train,Y_train,formatters_=formatter_)
+    # torch.save(neighs_dict_train,conf.train_neighs)
+    # get neight for test
+    # print('get neigs for test')
+    # Y_ficticious = {'loan_status':np.ones(shape=(X_test.shape[0],),dtype=np.int32)}
+    # neighs_dict_test = get_neig(X_test,Y=pd.DataFrame(Y_ficticious),formatters_=formatter_)
+    # torch.save(neighs_dict_test,conf.test_neights)
 
     print('train augmentation')
     X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
     X_train_dataset.to_csv(conf.X_train_dataset,index=False)
     Y_train.to_csv(conf.Y_train_dataset,index=False)
 
-    print('test encoding')
-    # make test dataset
-    X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
-    X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
-    X_test_dataset.to_csv(conf.X_test_dataset,index=False)
+
     pass
