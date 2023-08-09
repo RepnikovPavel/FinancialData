@@ -310,37 +310,6 @@ def rho_between_row_and_rows(table, r_index, r_indexes_2, distributions,names_of
 
 
 
-
-
-def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
-    X = pd.read_csv(inputpath_,index_col=False)
-    # gen new features
-    x2 = X['fico_range_high']
-    x1 = X['fico_range_low']
-    tmp = (x1+x2)/2.0
-    tmp = tmp.astype('int64')
-    X['fico_range_mid'] = tmp
-    tmp2 = x2-x1
-    tmp2 = tmp2.astype('int64')
-    X['fico_range_length'] = tmp2
-
-
-    
-    Y = pd.read_csv(lables_path,index_col=False).drop(columns=['index'])
-    # remove 
-    X.drop(columns=[
-                    'index',
-                    # 'zip_code',
-                    'title',
-                    'fico_range_high',
-                    'fico_range_low',
-                    # 'issue_d'
-                    ],inplace=True)
-
-
-
-    return X,Y
-
 def get_neigs_of(i,N,X,corr_m,distributions,names_of_columns):
     indexes = np.setdiff1d(np.random.randint(low=0,high=X.shape[0],size=N),[i])
     distances = rho_between_row_and_rows(X, r_index=i,r_indexes_2=indexes,distributions=distributions,corr_m=corr_m,names_of_columns=names_of_columns)
@@ -484,6 +453,34 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
 
 
+def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
+    X = pd.read_csv(inputpath_,index_col=False)
+    # gen new features
+    x2 = X['fico_range_high']
+    x1 = X['fico_range_low']
+    tmp = (x1+x2)/2.0
+    tmp = tmp.astype('int64')
+    X['fico_range_mid'] = tmp
+    # tmp2 = x2-x1
+    # tmp2 = tmp2.astype('int64')
+    # X['fico_range_length'] = tmp2
+
+
+    
+    Y = pd.read_csv(lables_path,index_col=False).drop(columns=['index'])
+    # remove 
+    X.drop(columns=[
+                    'index',
+                    # 'zip_code',
+                    # 'title',
+                    'fico_range_high',
+                    'fico_range_low',
+                    # 'issue_d'
+                    ],inplace=True)
+
+
+
+    return X,Y
 
 def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
     X = pd.read_csv(inputpath_,index_col=False)
@@ -493,15 +490,15 @@ def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
     tmp = (x1+x2)/2.0
     tmp = tmp.astype('int64')
     X['fico_range_mid'] = tmp
-    tmp2 = x2-x1
-    tmp2 = tmp2.astype('int64')
-    X['fico_range_length'] = tmp2
+    # tmp2 = x2-x1
+    # tmp2 = tmp2.astype('int64')
+    # X['fico_range_length'] = tmp2
     
     # remove 
     X.drop(columns=[
                     'index',
                     # 'zip_code',
-                    'title',
+                    # 'title',
                     'fico_range_high',
                     'fico_range_low',
                     # 'issue_d'
@@ -562,6 +559,7 @@ if __name__ == '__main__':
 
     print('train encoding')
     X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
+    make_encoders(X_train,output_path=conf.cat_encoders_path)
     # # # make train dataset
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
 
@@ -571,14 +569,16 @@ if __name__ == '__main__':
     X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
     X_test_dataset.to_csv(conf.X_test_dataset,index=False)
 
-    # get neigh for train 
-    print('get neighs for train')
-    neighs_dict_train = get_neig(X_train,formatters_=formatter_)
-    torch.save(neighs_dict_train,conf.train_neighs)
-    # get neight for test
-    print('get neigs for test')
-    neighs_dict_test = get_neig(X_test,formatters_=formatter_)
-    torch.save(neighs_dict_test,conf.test_neights)
+    # # # get neigh for train 
+    # print('get neighs for train')
+    # X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
+    # neighs_dict_train = get_neig(X_train,formatters_=formatter_)
+    # torch.save(neighs_dict_train,conf.train_neighs)
+    # # get neight for test
+    # print('get neigs for test')
+    # X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
+    # neighs_dict_test = get_neig(X_test,formatters_=formatter_)
+    # torch.save(neighs_dict_test,conf.test_neights)
 
     print('train augmentation')
     X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
