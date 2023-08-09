@@ -118,6 +118,11 @@ cat_features_ = [
     'zip_code' 
 ]
 
+do_not_augment = [
+    'issue_d'
+]
+
+
 # cat_features_that_different_by_unique_values_in_train_and_test= [
 #     'acc_now_delinq', # real poss cat
 #     'addr_state',          # cat
@@ -218,7 +223,7 @@ def X_train_or_test_to_1_format(inputpath_,outputpath_):
 
 @jit(nopython=True)
 def get_value_by_segment(x, counts_,bins_):
-    for i in range(1,len(bins_)-1):
+    for i in range(1,len(bins_)):
         if x<= bins_[i] and x>= bins_[i-1]:
             return counts_[i-1]
     return 0.0
@@ -229,9 +234,10 @@ def get_bin_index_by_value(x, bins_):
         return -1
     if x> bins_[-1]:
         return len(bins_)
-    for i in range(1,len(bins_)-1):
+    for i in range(1,len(bins_)):
         if x<= bins_[i] and x>= bins_[i-1]:
             return i-1
+
 
 class Distrib1D:
     counts_: np.array
@@ -247,14 +253,19 @@ class Distrib1D:
         self.b_= self.bins_[-1]
         self.std_ = np.nanstd(table[column_name])
     def __call__(self, x):
+        if pd.isna(x):
+            return x
         return get_value_by_segment(x,self.counts_,self.bins_)
     def mutate_value(self,x):
+        if pd.isna(x):
+            return x
         # get segment of value
         # if current_segment == -1:
         # if current_segment == len(self.bins_):
         if self.std_ < self.bins_[1]-self.bins_[0]:
             # move to nearest cells 
-            current_segment = get_bin_index_by_value(x)
+            current_segment = get_bin_index_by_value(x,self.bins_)
+            # print(current_segment)
             distance = int(np.random.normal(loc=1,scale=len(self.bins_)/2))
             new_pos = current_segment+distance
             return np.maximum(0,self.bins_[0] + new_pos*(self.bins_[1]-self.bins_[0]))
@@ -434,8 +445,10 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
     X_aug2 = X.copy()
     Y_aug2 = Y.copy()
     for cName in distributions:
+        if cName in do_not_augment:
+            continue
         print(cName)
-        X_aug2[cName] = X_aug2[cName].apply(distributions[cName])
+        X_aug2[cName] = X_aug2[cName].apply(distributions[cName].mutate_value)
 
     # nan augmentation for numeric features
     X_aug3 = X.copy()
@@ -472,7 +485,7 @@ def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
     X.drop(columns=[
                     'index',
                     # 'zip_code',
-                    # 'title',
+                    'title',
                     'fico_range_high',
                     'fico_range_low',
                     # 'issue_d'
@@ -498,7 +511,7 @@ def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
     X.drop(columns=[
                     'index',
                     # 'zip_code',
-                    # 'title',
+                    'title',
                     'fico_range_high',
                     'fico_range_low',
                     # 'issue_d'
