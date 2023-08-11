@@ -66,8 +66,23 @@ distribution of answers on train and test are same now
 ___
 
 
+![Alt text](image.png)
 
+
+```python
+dart 
+dropout_rate = 0.2
+N 2658
+"(2007.495867768595, 2008.5149396058487)" last train auc 0.903188052684663 last validation auc 0.7926050825003012 oprimal_trees 94 time_of_train 0.09047067562739054 min
+N 5750
+"(2008.5149396058487, 2009.5340114431024)" last train auc 0.9256743619435664 last validation auc 0.8262852179577655 oprimal_trees 707 time_of_train 4.708107340335846 min
+N 18640
+"(2009.5340114431024, 2010.553083280356)" last train auc 0.8836215598882383 last validation auc 0.7625066731806103 oprimal_trees 2033 time_of_train 79.108909145991 min
+N 38865
+"(2010.553083280356, 2011.5721551176098)" last train auc 0.8496404489361133 last validation auc 0.7555143638504844 oprimal_trees 1097 time_of_train 40.824989489714305 min
+```
 
 # links  
 1. [best](https://www.youtube.com/watch?v=NVKDSNM702k)
 2. [for begginers](https://www.youtube.com/live/xfKui8OR2dc?feature=share)
+3. [about xgboost from kagglers](https://www.kaggle.com/code/bextuychiev/20-burning-xgboost-faqs-answered-to-use-like-a-pro)

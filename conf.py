@@ -19,3 +19,5 @@ X_test_dataset = os.path.join(data_folder,'X_test_dataset.csv')
 submission_csv = os.path.join(data_folder,'answer.csv')
 submission_zip = os.path.join(data_folder,'answer.zip')
 
+
+xgb_models_pattern = os.path.join(data_folder,'xgb_model_')

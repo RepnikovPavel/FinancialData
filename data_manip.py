@@ -466,6 +466,7 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
 
 
+
 def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
     X = pd.read_csv(inputpath_,index_col=False)
     # gen new features
@@ -516,6 +517,31 @@ def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
                     'fico_range_low',
                     # 'issue_d'
                     ],inplace=True)
+    return X
+
+def get_numeric_limits(X:pd.DataFrame,formatters_):
+    limits = {} 
+    for cName in X:
+        if cName in formatters_:
+            expected_type = formatters_[cName]['to_type']
+            if 'int' in expected_type or 'float' in expected_type:
+                min = X[cName].min()
+                max = X[cName].max()
+                limits.update({cName: (min, max)})
+    return limits
+
+@jit(nopython=True)
+def restriction_on_borders(x,limits):
+    if x < limits[0]:
+        x = limits[0]
+    if x > limits[1]:
+        x = limits[1]
+    return x
+
+def apply_limits(X:pd.DataFrame,limits):
+    for cName in limits:
+        f= lambda x: restriction_on_borders(x,limits[cName])
+        X[cName] = X[cName].apply(f)
     return X
 
 
@@ -577,9 +603,11 @@ if __name__ == '__main__':
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
 
     print('test encoding')
+    limits = get_numeric_limits(X_train,formatter_)
     # make test dataset
     X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
     X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
+    X_test_dataset = apply_limits(X_test_dataset,limits)
     X_test_dataset.to_csv(conf.X_test_dataset,index=False)
 
     # # # get neigh for train 
@@ -592,6 +620,7 @@ if __name__ == '__main__':
     # X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
     # neighs_dict_test = get_neig(X_test,formatters_=formatter_)
     # torch.save(neighs_dict_test,conf.test_neights)
+
 
     print('train augmentation')
     X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
