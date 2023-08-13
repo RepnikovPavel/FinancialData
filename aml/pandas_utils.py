@@ -51,3 +51,13 @@ def is_data_identical(table1,table2)->pd.DataFrame:
     other = np.setdiff1d(all_names,first_cols).tolist()
     out_columns = first_cols+other
     return df[out_columns]
+
+def group_by_unique_values(table:pd.DataFrame,column_name):
+    vs = np.unique(table[column_name].to_numpy())
+    vs = vs[~pd.isna(vs)]
+    groups = []
+    for v in vs:
+        gr_i = table[column_name].loc[table[column_name]==v]
+        groups.append(gr_i)
+
+    return vs,groups
