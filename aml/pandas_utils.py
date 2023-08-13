@@ -5,17 +5,17 @@ import pandas as pd
 def get_min_max(table,column_name):
     return table[column_name].min(),table[column_name].max()
 def group_by_time_interval(table:pd.DataFrame, column_name, time_intervals):
-    groups = {}
+    groups = []
     for i in range(len(time_intervals)):
         print('\r{}/{}'.format(i,len(time_intervals)-1),end='')
         t1,t2 = time_intervals[i]
         greather_then = table.loc[table[column_name] >= t1]
         if i == len(time_intervals)-1:
             greather_and_less = greather_then.loc[greather_then[column_name] <= t2]
-            groups.update({time_intervals[i]: greather_and_less})
+            groups.append(greather_and_less)
         else:
             greather_and_less = greather_then.loc[greather_then[column_name] < t2]
-            groups.update({time_intervals[i]: greather_and_less})
+            groups.append(greather_and_less)
     print('')
     return groups
 def is_data_identical(table1,table2)->pd.DataFrame:

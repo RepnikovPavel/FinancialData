@@ -481,7 +481,7 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
 
 
-    # # nan augmentation for categorial features
+    # nan augmentation for categorial features
     # X_aug = X.copy()
     # Y_aug = Y.copy()
     # rate_of_categorial_nan = 0.5
@@ -489,7 +489,7 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
     #     if nan_aug_feature in X_aug:
     #         position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_categorial_nan))
     #         X_aug.loc[position_of_nan, nan_aug_feature] = pd.NA
-    #         # X_aug[nan_aug_feature] = np.insert(X_aug[nan_aug_feature].values, position_of_nan, np.nan)
+            # X_aug[nan_aug_feature] = np.insert(X_aug[nan_aug_feature].values, position_of_nan, np.nan)
 
     # print('mutate numeric values using distribution knowledge')
     # # mutate numeric values using distribution knowledge
@@ -690,6 +690,7 @@ if __name__ == '__main__':
     X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
     make_encoders(X_train,output_path=conf.cat_encoders_path, label_encode_feautures=label_encode_feautures_)
     # # # make train dataset
+    # X_train_dataset = train_augmentation(X_train,Y_train,formatters_=formatter_)
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
     X_train_dataset = make_pairs_of_feautures(X_train_dataset,pairs_features_)
     X_train_dataset = one_hot_encode(X_train_dataset,one_hot_feautures=one_hot_feautures_)
@@ -705,6 +706,16 @@ if __name__ == '__main__':
     X_test_dataset = one_hot_encode(X_test_dataset,one_hot_feautures=one_hot_feautures_)
     X_test_dataset = apply_limits(X_test_dataset,limits)
     # X_test_dataset = apply_log(X_test_dataset, apply_log_to)
+
+    # ns1 = [el for el in X_train_dataset]
+    # ns2 = [el for el in X_test_dataset]
+    # names_diff_1 = np.setdiff1d(ns1,ns2)
+    # X_train_dataset.drop(columns=names_diff_1,inplace=True)
+    # names_diff_2 = np.setdiff1d(ns2,ns1)
+    # X_test_dataset.drop(columns=names_diff_2,inplace=True)
+
+
+
     X_test_dataset.to_csv(conf.X_test_dataset,index=False)
 
     # # # get neigh for train 
