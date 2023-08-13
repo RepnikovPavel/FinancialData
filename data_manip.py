@@ -14,6 +14,7 @@ import pandas as pd
 import copy
 import os
 import torchvision
+from scipy.stats import boxcox
 from torchvision.models.detection.faster_rcnn import FastRCNNPredictor,FasterRCNN_ResNet50_FPN_Weights
 from torchinfo import summary
 
@@ -52,6 +53,7 @@ import mpl_toolkits.axisartist.floating_axes as floating_axes
 from IPython.display import IFrame, display, HTML
 import multiprocessing as mp
 import matplotlib
+from UI.plotting import *
 matplotlib.use('TkAgg')
 
 formatter_ = {
@@ -107,20 +109,53 @@ cat_features_that_different_by_unique_values_in_train_and_test= [
     'title'
 ]
 
-cat_features_ = [
+label_encode_feautures_ = [
     'addr_state',
     'emp_length',
     'home_ownership',
     'purpose',
     'term',
-    'title',
     'verification_status',
     'zip_code' 
+]
+
+one_hot_feautures_ = [
+    'addr_state',
+    'emp_length',
+    'home_ownership',
+    'purpose',
+    'term',
+    'verification_status',
+    # 'zip_code'
+]
+pairs_features_ = [
+    # 'addr_state', # 56
+    'emp_length', # 12 
+    'purpose', # 14
+    # 'home_ownership', # 6 
+    # 'verification_status', #3
+    # 'term', #2
 ]
 
 do_not_augment = [
     'issue_d'
 ]
+apply_log_to = [
+    'acc_now_delinq',
+    'annual_inc',
+    'chargeoff_within_12_mths',
+    'collections_12_mths_ex_med',
+    'delinq_2yrs',
+    'inq_last_12m',
+    'mort_acc',
+    'num_accts_ever_120_pd',
+    'num_tl_120dpd_2m',
+    'num_tl_30dpd',
+    'num_tl_90g_dpd_24m',
+    'pub_rec',
+    'pub_rec_bankruptcies',
+]
+
 
 
 # cat_features_that_different_by_unique_values_in_train_and_test= [
@@ -416,6 +451,21 @@ def get_neig(X,formatters_):
 # tmp_file.close()
 # raise SystemExit
 
+def apply_log(X,columns_list):
+    for cName in columns_list:
+        if cName not in X:
+            continue
+        # plot_float_distribution(X[cName],(16,9),'before')
+        # data_,lambda_ = boxcox(X[cName]+1.0)
+        if len(X[cName].loc[X[cName] < 0.0]) !=0 :
+            print('cannot apply log to negative values')
+            raise SystemExit
+        X[cName] = np.log(X[cName]+1)
+        # plot_float_distribution(X[cName],(16,9),'after')
+        # plt.show()
+    return X
+
+
 def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
 
     # make distributions
@@ -427,40 +477,41 @@ def train_augmentation(X:pd.DataFrame,Y:pd.DataFrame,formatters_):
         if 'int' in expected_type or 'float' in expected_type:
             distr_ = Distrib1D(X,cName)
             distributions.update({cName:distr_})
+    N = X.shape[0]
 
 
-    # nan augmentation for categorial features
-    X_aug = X.copy()
-    Y_aug = Y.copy()
-    N = X_aug.shape[0]
-    rate_of_categorial_nan = 0.5
-    for nan_aug_feature in cat_features_that_different_by_unique_values_in_train_and_test:
-        if nan_aug_feature in X_aug:
-            position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_categorial_nan))
-            X_aug.loc[position_of_nan, nan_aug_feature] = pd.NA
-            # X_aug[nan_aug_feature] = np.insert(X_aug[nan_aug_feature].values, position_of_nan, np.nan)
 
-    print('mutate numeric values using distribution knowledge')
-    # mutate numeric values using distribution knowledge
-    X_aug2 = X.copy()
-    Y_aug2 = Y.copy()
-    for cName in distributions:
-        if cName in do_not_augment:
-            continue
-        print(cName)
-        X_aug2[cName] = X_aug2[cName].apply(distributions[cName].mutate_value)
+    # # nan augmentation for categorial features
+    # X_aug = X.copy()
+    # Y_aug = Y.copy()
+    # rate_of_categorial_nan = 0.5
+    # for nan_aug_feature in cat_features_that_different_by_unique_values_in_train_and_test:
+    #     if nan_aug_feature in X_aug:
+    #         position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_categorial_nan))
+    #         X_aug.loc[position_of_nan, nan_aug_feature] = pd.NA
+    #         # X_aug[nan_aug_feature] = np.insert(X_aug[nan_aug_feature].values, position_of_nan, np.nan)
 
-    # nan augmentation for numeric features
-    X_aug3 = X.copy()
-    Y_aug3 = Y.copy()
-    rate_of_numeric_nan = 0.5
-    for cName in distributions:
-        position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_numeric_nan))
-        X_aug3.loc[position_of_nan, cName] = pd.NA
+    # print('mutate numeric values using distribution knowledge')
+    # # mutate numeric values using distribution knowledge
+    # X_aug2 = X.copy()
+    # Y_aug2 = Y.copy()
+    # for cName in distributions:
+    #     if cName in do_not_augment:
+    #         continue
+    #     print(cName)
+    #     X_aug2[cName] = X_aug2[cName].apply(distributions[cName].mutate_value)
+
+    # # nan augmentation for numeric features
+    # X_aug3 = X.copy()
+    # Y_aug3 = Y.copy()
+    # rate_of_numeric_nan = 0.5
+    # for cName in distributions:
+    #     position_of_nan = np.random.randint(low=0,high=N,size=int(N*rate_of_numeric_nan))
+    #     X_aug3.loc[position_of_nan, cName] = pd.NA
 
 
-    X_final = pd.concat([X,X_aug,X_aug2,X_aug3])
-    Y_final = pd.concat([Y,Y_aug,Y_aug2,Y_aug3])
+    X_final = pd.concat([X])
+    Y_final = pd.concat([Y])
 
     return X_final,Y_final
 
@@ -475,26 +526,71 @@ def _1_format_to_train_dataset(inputpath_:str,lables_path:str)-> pd.DataFrame:
     tmp = (x1+x2)/2.0
     tmp = tmp.astype('int64')
     X['fico_range_mid'] = tmp
-    # tmp2 = x2-x1
-    # tmp2 = tmp2.astype('int64')
-    # X['fico_range_length'] = tmp2
-
-
     
     Y = pd.read_csv(lables_path,index_col=False).drop(columns=['index'])
-    # remove 
+    
     X.drop(columns=[
                     'index',
-                    # 'zip_code',
                     'title',
                     'fico_range_high',
                     'fico_range_low',
-                    # 'issue_d'
                     ],inplace=True)
-
-
-
     return X,Y
+
+def one_hot_encode(X,one_hot_feautures):
+    # names1 = [el for el in X]
+    X = pd.get_dummies(X, columns=one_hot_feautures, drop_first= True, dummy_na=True)
+    # names2 = [el for el in X]
+    return X
+
+# @jit(nopython=True)
+def d1d2_labels_to_d3_labels(d1:np.array, d2: np.array)->np.array:
+    vs1 = np.unique(d1)
+    vs1 = vs1[~np.isnan(vs1)]
+    vs2 = np.unique(d2)
+    vs2 = vs2[~np.isnan(vs2)]
+    n1 = len(vs1)
+    n2 = len(vs2)
+    m = np.zeros(shape=(n1, n2),dtype=np.intc)
+    k_ = 0
+    for i in range(n1):
+        for j in range(n2):
+            m[i][j] = k_
+            k_ += 1
+    nan_label = n1*n2
+    N = len(d1)
+    o_ = np.zeros(shape=(N,),dtype=np.intc)
+    for i in range(N):
+        v1 = d1[i]
+        v2 = d2[i]
+        if np.isnan(v1) or np.isnan(v2):
+            o_[i] = nan_label
+            continue
+        o_[i] = m[v1][v2]
+    return o_
+
+def make_pairs_of_feautures(X, columns):
+    # columns must be label encoded
+    # nan supported
+    N = len(columns)
+    k_=0
+    for i in range(N-1):
+        for j in range(i+1, N):
+            n1 = columns[i]
+            n2 = columns[j]
+            print('pair {} and {} progress {} %'.format(n1,n2,int((k_+1)/((N*(N-1)/2))*100)))
+            d1 = X[n1].values
+            d2 = X[n2].values
+            d3 = d1d2_labels_to_d3_labels(d1,d2)
+            n3 = n1+'_and_'+n2
+            X[n3] = d3
+            X = pd.get_dummies(X, columns=[n3], drop_first= True, dummy_na=False)
+            k_ +=1
+    return X
+
+
+
+
 
 def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
     X = pd.read_csv(inputpath_,index_col=False)
@@ -504,18 +600,12 @@ def _1_format_to_test_dataset(inputpath_:str)-> pd.DataFrame:
     tmp = (x1+x2)/2.0
     tmp = tmp.astype('int64')
     X['fico_range_mid'] = tmp
-    # tmp2 = x2-x1
-    # tmp2 = tmp2.astype('int64')
-    # X['fico_range_length'] = tmp2
-    
-    # remove 
+
     X.drop(columns=[
                     'index',
-                    # 'zip_code',
                     'title',
                     'fico_range_high',
                     'fico_range_low',
-                    # 'issue_d'
                     ],inplace=True)
     return X
 
@@ -560,11 +650,11 @@ class CategorialEncoder:
         # new_vs[pd.isnull(vs)] = pd.NA
         return o_
     
-def make_encoders(X:pd.DataFrame,output_path:str):
+def make_encoders(X:pd.DataFrame,output_path:str,label_encode_feautures):
     cNames = [el for el in X]
     encoders = {}
-    for i,cat_feature in enumerate(cat_features_):
-        print('{}% column name {}'.format(int(((i+1)/len(cat_features_))*100),cat_feature))
+    for i,cat_feature in enumerate(label_encode_feautures):
+        print('{}% column name {}'.format(int(((i+1)/len(label_encode_feautures))*100),cat_feature))
         if cat_feature not in cNames:
             continue
         cData = X[cat_feature].dropna().to_list()
@@ -592,22 +682,29 @@ if __name__ == '__main__':
     # print('test reformatting')
     # X_train_or_test_to_1_format(inputpath_=conf.test_table,outputpath_=conf.X_test_reformated)
 
-    # drop columns, make new features, make label encoders
+    # # drop columns, make new features, make label encoders
     # X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
     # make_encoders(X_train,output_path=conf.cat_encoders_path)
 
     print('train encoding')
     X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
-    make_encoders(X_train,output_path=conf.cat_encoders_path)
+    make_encoders(X_train,output_path=conf.cat_encoders_path, label_encode_feautures=label_encode_feautures_)
     # # # make train dataset
     X_train_dataset = encode(X_train,encoders=torch.load(conf.cat_encoders_path))
+    X_train_dataset = make_pairs_of_feautures(X_train_dataset,pairs_features_)
+    X_train_dataset = one_hot_encode(X_train_dataset,one_hot_feautures=one_hot_feautures_)
+    # X_train_dataset = apply_log(X_train_dataset, apply_log_to)
+
 
     print('test encoding')
     limits = get_numeric_limits(X_train,formatter_)
     # make test dataset
     X_test = _1_format_to_test_dataset(inputpath_=conf.X_test_reformated)
     X_test_dataset = encode(X_test,encoders=torch.load(conf.cat_encoders_path))
+    X_test_dataset = make_pairs_of_feautures(X_test_dataset, pairs_features_)
+    X_test_dataset = one_hot_encode(X_test_dataset,one_hot_feautures=one_hot_feautures_)
     X_test_dataset = apply_limits(X_test_dataset,limits)
+    # X_test_dataset = apply_log(X_test_dataset, apply_log_to)
     X_test_dataset.to_csv(conf.X_test_dataset,index=False)
 
     # # # get neigh for train 
@@ -623,7 +720,8 @@ if __name__ == '__main__':
 
 
     print('train augmentation')
-    X_train_dataset,Y_train = train_augmentation(X_train_dataset,Y_train,formatters_=formatter_)
+    # X_train_dataset = X_train
+    # X_train_dataset,Y_train = train_augmentation(X_train_dataset, Y_train,formatters_=formatter_)
     X_train_dataset.to_csv(conf.X_train_dataset,index=False)
     Y_train.to_csv(conf.Y_train_dataset,index=False)
 
