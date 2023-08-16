@@ -675,12 +675,12 @@ def encode(X:pd.DataFrame,encoders:dict[str,LabelEncoder])->pd.DataFrame:
     return X
 
 if __name__ == '__main__':
-    # # convert types train data
-    # print('train reformatting')
-    # X_train_or_test_to_1_format(inputpath_=conf.train_table,outputpath_=conf.X_train_reformated)
-    # # convert types test data 
-    # print('test reformatting')
-    # X_train_or_test_to_1_format(inputpath_=conf.test_table,outputpath_=conf.X_test_reformated)
+    # convert types train data
+    print('train reformatting')
+    X_train_or_test_to_1_format(inputpath_=conf.train_table,outputpath_=conf.X_train_reformated)
+    # convert types test data 
+    print('test reformatting')
+    X_train_or_test_to_1_format(inputpath_=conf.test_table,outputpath_=conf.X_test_reformated)
 
     # # drop columns, make new features, make label encoders
     # X_train,Y_train = _1_format_to_train_dataset(inputpath_=conf.X_train_reformated,lables_path=conf.train_target)
