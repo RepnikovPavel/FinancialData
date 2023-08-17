@@ -14,9 +14,15 @@ data_folder = r'/home/user/FTC/ROW_DATA'
 5. ответ answer.zip будет записан в папку data_folder 
 
 
+# ссылка на dataset  
+
+[dataset](https://www.kaggle.com/datasets/repnikovpavel/financialdatabinaryclassificationtargetauc)
+
 # ссылка на гитхаб страницу
 
 [source code](https://github.com/RepnikovPavel/FinancialData)
+
+
 
 
 # links  
