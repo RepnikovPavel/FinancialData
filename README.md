@@ -13,6 +13,12 @@ data_folder = r'/home/user/FTC/ROW_DATA'
 4. запустить все ячейки кода в файле devide_and_conqurer_by_time.ipynb
 5. ответ answer.zip будет записан в папку data_folder 
 
+
+# ссылка на гитхаб страницу
+
+[source code](https://github.com/RepnikovPavel/FinancialData)
+
+
 # links  
 1. [best](https://www.youtube.com/watch?v=NVKDSNM702k)
 2. [for begginers](https://www.youtube.com/live/xfKui8OR2dc?feature=share)
